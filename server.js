@@ -1,9 +1,9 @@
-// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const path = require('path');
+const MongoClient = require('mongodb').MongoClient; // MongoDB native driver
 
 dotenv.config(); // Load environment variables
 
@@ -15,13 +15,16 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static('public')); // Serve static files from the 'public' folder
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('Error connecting to MongoDB:', err));
+// Log the MongoDB URI to verify it's loaded correctly
+console.log('MongoDB URI:', process.env.MONGO_URI);
+
+// Connect to MongoDB using Mongoose without deprecated options
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('Connected to MongoDB with Mongoose'))
+  .catch(err => {
+    console.error('Error connecting to MongoDB with Mongoose:', err.message);
+    process.exit(1);
+  });
 
 // Define Mongoose Schema and Model
 const submissionSchema = new mongoose.Schema({
@@ -32,7 +35,7 @@ const submissionSchema = new mongoose.Schema({
 
 const Submission = mongoose.model('Submission', submissionSchema);
 
-// Handle form submissions
+// Handle form submissions with validation
 app.post('/submit', async (req, res) => {
   try {
     const { name, email, message } = req.body;
@@ -51,6 +54,28 @@ app.post('/submit', async (req, res) => {
   }
 });
 
+// Connect to MongoDB using the native driver
+MongoClient.connect(process.env.MONGO_URI, (err, client) => {
+  if (err) {
+    console.error('Error connecting to MongoDB with native driver:', err);
+    return;
+  }
+  console.log('Connected to MongoDB with native driver');
+  const db = client.db("test"); // Replace "test" with your database name if needed
+  const collection = db.collection("devices"); // Replace "devices" with your collection name if needed
+
+  // Perform actions on the collection object, e.g., find, insert, update
+  // Example: Fetching all documents from the "devices" collection
+  collection.find({}).toArray((err, items) => {
+    if (err) {
+      console.error('Error fetching documents from collection:', err);
+    } else {
+      console.log('Fetched documents from collection:', items);
+    }
+    client.close(); // Close the connection after performing actions
+  });
+});
+
 // Serve index.html for all other routes
 app.get('*', (req, res) => {
   res.sendFile(path.resolve(__dirname, 'public', 'index.html'));
@@ -60,3 +85,5 @@ app.get('*', (req, res) => {
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
+
+
